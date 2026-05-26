@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 
 from src.config import AppConfig
 from src.core.pipeline import FramePipeline
+from src.ui.frame_view import frame_to_pixmap
 from src.voice.speech import VoiceInput
 
 
@@ -92,17 +93,31 @@ class MainWindow(QMainWindow):
             self.pipeline.stop()
             self._frame_timer.stop()
             self._btn_camera.setText("Старт камеры")
+            self._video_label.clear()
             self._video_label.setText("Превью камеры\n(камера остановлена)")
             self._append_system("Камера остановлена.")
         else:
-            self.pipeline.start()
+            if not self.pipeline.start():
+                self._append_system(
+                    "Не удалось открыть камеру. Проверьте подключение и индекс в config."
+                )
+                return
             self._frame_timer.start()
             self._btn_camera.setText("Стоп камеры")
-            self._video_label.setText("Камера активна\n(OpenCV — в разработке)")
-            self._append_system("Камера запущена (захват кадров — заглушка).")
+            self._video_label.clear()
+            self._append_system("Камера запущена.")
 
     def _on_frame_tick(self) -> None:
-        self._last_context = self.pipeline.process_frame()
+        context = self.pipeline.process_frame()
+        if context is None or context.frame is None:
+            return
+        self._last_context = context
+        pixmap = frame_to_pixmap(
+            context.frame,
+            self._video_label.width(),
+            self._video_label.height(),
+        )
+        self._video_label.setPixmap(pixmap)
 
     def _on_send_text(self) -> None:
         question = self._question_input.text().strip()

@@ -44,7 +44,7 @@ class VisionService:
         return FrameContext(
             frame=frame,
             detections=detections,
-            summary=self._build_summary(detections),
+            summary=self._build_summary(detections, frame is not None),
         )
 
     def _detect_qr(self, frame: Any) -> list[Detection]:
@@ -64,8 +64,10 @@ class VisionService:
         return []
 
     @staticmethod
-    def _build_summary(detections: list[Detection]) -> str:
+    def _build_summary(detections: list[Detection], has_frame: bool = False) -> str:
         if not detections:
-            return "Объекты не обнаружены (шаблон)."
+            if has_frame:
+                return "Камера активна. Объекты не обнаружены."
+            return "Камера не активна."
         parts = [f"{d.kind}: {d.label}" for d in detections]
         return "; ".join(parts)

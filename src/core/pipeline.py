@@ -25,9 +25,12 @@ class FramePipeline:
         self.assistant = AIAssistant()
         self._running = False
 
-    def start(self) -> None:
+    def start(self) -> bool:
+        if not self.camera.open():
+            self._running = False
+            return False
         self._running = True
-        self.camera.open()
+        return True
 
     def stop(self) -> None:
         self._running = False

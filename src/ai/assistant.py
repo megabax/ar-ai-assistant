@@ -12,7 +12,7 @@ class AIAssistant:
     """Обёртка над LLM / vision API (пока заглушка)."""
 
     def answer(self, question: str, context: FrameContext | None = None) -> str:
-        scene = context.summary if context else "камера не активна"
+        scene = context.summary if context else "Камера не активна."
         # TODO: multimodal prompt (frame + detections + question)
         return (
             f"[Шаблон] Вопрос: «{question.strip()}»\n"
