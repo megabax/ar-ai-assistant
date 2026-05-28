@@ -11,5 +11,5 @@ class AppConfig:
     camera_index: int = 0
     target_fps: int = 30
     enabled_detectors: list[str] = field(
-        default_factory=lambda: ["qr", "aruco", "face", "hand"]
+        default_factory=lambda: ["yolo", "qr", "aruco", "face", "hand"]
     )
