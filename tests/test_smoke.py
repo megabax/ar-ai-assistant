@@ -1,3 +1,4 @@
+import os
 import sys
 import unittest
 
@@ -14,6 +15,8 @@ from src.vision.detectors import FrameContext, VisionService
 class SmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        # Не дергаем Ollama в unit-тестах
+        os.environ["AI_PET_ENABLE_LLM"] = "0"
         cls._qt_app = QApplication.instance() or QApplication(sys.argv)
 
     def test_config_defaults(self) -> None:
