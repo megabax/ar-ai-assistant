@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.ai.assistant import AIAssistant
+from src.ai.assistant import AIAssistant, AIResponse
 from src.camera.capture import CameraSource
 from src.config import AppConfig
 from src.overlay.renderer import OverlayRenderer
@@ -53,6 +53,6 @@ class FramePipeline:
         self.overlay.render(context)
         return context
 
-    def ask(self, question: str, context: FrameContext | None = None) -> str:
+    def ask(self, question: str, context: FrameContext | None = None) -> AIResponse:
         """Текстовый или голосовой вопрос к ИИ о текущей сцене."""
         return self.assistant.answer(question, context)

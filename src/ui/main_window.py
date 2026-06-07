@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.ai.assistant import AIResponse
 from src.config import AppConfig
 from src.core.pipeline import FramePipeline
 from src.ui.frame_view import frame_to_pixmap
@@ -125,8 +126,8 @@ class MainWindow(QMainWindow):
             return
         self._question_input.clear()
         self._chat_log.append(f"<b>Вы:</b> {question}")
-        answer = self.pipeline.ask(question, self._last_context)
-        self._chat_log.append(f"<b>ИИ:</b> {answer.replace(chr(10), '<br>')}")
+        response = self.pipeline.ask(question, self._last_context)
+        self._append_ai_response(response)
 
     def _on_voice(self) -> None:
         self._append_system("Голосовой ввод пока не подключён.")
@@ -134,6 +135,23 @@ class MainWindow(QMainWindow):
         if text:
             self._question_input.setText(text)
             self._on_send_text()
+
+    def _append_ai_response(self, response: AIResponse) -> None:
+        text = response.content.replace("\n", "<br>")
+        elapsed = self._format_elapsed(response.elapsed_s)
+        self._chat_log.append(f"<b>ИИ:</b> {text}")
+        meta = f"Модель: {response.model} · {elapsed}"
+        if response.is_stub:
+            meta += " · заглушка"
+        if response.error:
+            meta += f" · {response.error}"
+        self._chat_log.append(f"<span style='color:#6a9955;'>{meta}</span>")
+
+    @staticmethod
+    def _format_elapsed(seconds: float) -> str:
+        if seconds < 1.0:
+            return f"{seconds * 1000:.0f} мс"
+        return f"{seconds:.2f} с"
 
     def _append_system(self, message: str) -> None:
         self._chat_log.append(f"<i style='color:#888;'>{message}</i>")

@@ -36,12 +36,13 @@ class SmokeTests(unittest.TestCase):
 
     def test_assistant_stub(self) -> None:
         reply = AIAssistant().answer("Что это?", FrameContext(frame=None))
-        self.assertIn("Шаблон", reply)
+        self.assertIn("Шаблон", reply.content)
+        self.assertEqual(reply.model, "заглушка")
 
     def test_pipeline_ask_without_camera(self) -> None:
         pipe = FramePipeline(AppConfig())
         answer = pipe.ask("Привет")
-        self.assertIn("Камера не активна", answer)
+        self.assertIn("Камера не активна", answer.content)
 
 
 if __name__ == "__main__":
