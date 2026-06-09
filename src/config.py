@@ -1,4 +1,9 @@
 from dataclasses import dataclass, field
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_VOSK_MODEL_DIR = PROJECT_ROOT / "models" / "vosk-model-small-ru-0.22"
 
 
 @dataclass
@@ -13,3 +18,6 @@ class AppConfig:
     enabled_detectors: list[str] = field(
         default_factory=lambda: ["yolo", "qr", "aruco", "face", "hand"]
     )
+    vosk_model_dir: Path = field(default_factory=lambda: DEFAULT_VOSK_MODEL_DIR)
+    voice_listen_seconds: float = 5.0
+    voice_sample_rate: int = 16000

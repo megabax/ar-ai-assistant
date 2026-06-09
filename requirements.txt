@@ -2,10 +2,11 @@
 PyQt6>=6.6.0
 opencv-python>=4.9.0
 numpy>=1.26.0
+vosk>=0.3.45
+sounddevice>=0.4.6
 
 # Будущие зависимости (раскомментировать по мере реализации):
 # mediapipe>=0.10.0
 # pyzbar>=0.1.9
 # openai>=1.0.0  # optional: если не установлен, используем прямой HTTP к Ollama
-# SpeechRecognition>=3.10.0
 # pyttsx3>=2.90

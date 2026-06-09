@@ -10,6 +10,7 @@ from src.config import AppConfig
 from src.core.pipeline import FramePipeline
 from src.ui.frame_view import frame_to_pixmap
 from src.vision.detectors import FrameContext, VisionService
+from src.voice.speech import VoiceInput
 
 
 class SmokeTests(unittest.TestCase):
@@ -43,6 +44,20 @@ class SmokeTests(unittest.TestCase):
         pipe = FramePipeline(AppConfig())
         answer = pipe.ask("Привет")
         self.assertIn("Камера не активна", answer.content)
+
+    def test_voice_disabled(self) -> None:
+        os.environ["AI_PET_ENABLE_VOICE"] = "0"
+        result = VoiceInput(AppConfig()).listen()
+        self.assertIsNone(result.text)
+        self.assertIn("отключён", result.error or "")
+
+    def test_voice_model_missing(self) -> None:
+        os.environ["AI_PET_ENABLE_VOICE"] = "1"
+        cfg = AppConfig()
+        cfg.vosk_model_dir = cfg.vosk_model_dir.parent / "missing-vosk-model"
+        result = VoiceInput(cfg).listen()
+        self.assertIsNone(result.text)
+        self.assertIn("Vosk", result.error or "")
 
 
 if __name__ == "__main__":

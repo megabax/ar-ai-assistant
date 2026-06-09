@@ -19,7 +19,8 @@ from src.ai.assistant import AIResponse
 from src.config import AppConfig
 from src.core.pipeline import FramePipeline
 from src.ui.frame_view import frame_to_pixmap
-from src.voice.speech import VoiceInput
+from src.voice.speech import VoiceListenResult
+from src.voice.worker import VoiceListenWorker
 
 
 class MainWindow(QMainWindow):
@@ -27,7 +28,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config = config
         self.pipeline = pipeline
-        self.voice = VoiceInput()
+        self._voice_worker: VoiceListenWorker | None = None
         self._last_context = None
 
         self.setWindowTitle(config.window_title)
@@ -130,11 +131,31 @@ class MainWindow(QMainWindow):
         self._append_ai_response(response)
 
     def _on_voice(self) -> None:
-        self._append_system("Голосовой ввод пока не подключён.")
-        text = self.voice.listen()
-        if text:
-            self._question_input.setText(text)
-            self._on_send_text()
+        if self._voice_worker is not None and self._voice_worker.isRunning():
+            return
+
+        self._btn_voice.setEnabled(False)
+        seconds = self.config.voice_listen_seconds
+        self._append_system(f"Слушаю микрофон ({seconds:.0f} с)…")
+        self._voice_worker = VoiceListenWorker(self.config, self)
+        self._voice_worker.finished.connect(self._on_voice_finished)
+        self._voice_worker.start()
+
+    def _on_voice_finished(self, result: VoiceListenResult) -> None:
+        self._btn_voice.setEnabled(True)
+        if result.error:
+            self._append_system(result.error)
+            return
+        if not result.text:
+            self._append_system("Речь не распознана.")
+            return
+
+        elapsed = self._format_elapsed(result.elapsed_s)
+        self._chat_log.append(
+            f"<span style='color:#6a9955;'>Распознано ({elapsed}): {result.text}</span>"
+        )
+        self._question_input.setText(result.text)
+        self._on_send_text()
 
     def _append_ai_response(self, response: AIResponse) -> None:
         text = response.content.replace("\n", "<br>")
@@ -157,5 +178,7 @@ class MainWindow(QMainWindow):
         self._chat_log.append(f"<i style='color:#888;'>{message}</i>")
 
     def closeEvent(self, event) -> None:
+        if self._voice_worker is not None and self._voice_worker.isRunning():
+            self._voice_worker.wait(3000)
         self.pipeline.stop()
         super().closeEvent(event)
