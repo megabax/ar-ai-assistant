@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -12,6 +13,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.vision.detectors import FrameContext
+
+_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
+_cached_base_url: str | None = None
 
 
 @dataclass
@@ -32,14 +36,20 @@ class AIAssistant:
         if os.getenv("AI_PET_ENABLE_LLM", "1") != "1":
             return self._template_answer(question, scene)
 
-        base_url = self._normalize_base_url(
-            os.getenv("AI_PET_OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1")
-        )
         api_key = os.getenv("AI_PET_OLLAMA_API_KEY", "ollama")
-        model = os.getenv("AI_PET_OLLAMA_MODEL", "deepseek-r1:7b")
+        model = os.getenv("AI_PET_OLLAMA_MODEL", "phi3:3.8b")
         temperature = float(os.getenv("AI_PET_TEMPERATURE", "0.0"))
         top_p = float(os.getenv("AI_PET_TOP_P", "0.1"))
         timeout_s = float(os.getenv("AI_PET_LLM_TIMEOUT", "120"))
+
+        base_url = self._resolve_base_url(os.getenv("AI_PET_OLLAMA_BASE_URL"))
+        if base_url is None:
+            return self._template_answer(
+                question,
+                scene,
+                model=model,
+                error=self._connection_help(),
+            )
 
         prompt = self._build_prompt(question, scene)
 
@@ -79,20 +89,97 @@ class AIAssistant:
                 elapsed = time.perf_counter() - started
                 return AIResponse(content=content, model=model, elapsed_s=elapsed)
             except Exception as http_error:
+                global _cached_base_url
+                _cached_base_url = None
                 return self._template_answer(
                     question,
                     scene,
                     model=model,
-                    error=f"{openai_error}; {http_error}",
+                    error=self._format_error(openai_error, http_error, base_url),
                 )
+
+    @classmethod
+    def _resolve_base_url(cls, configured: str | None) -> str | None:
+        global _cached_base_url
+        if _cached_base_url and cls._probe_ollama(_cached_base_url):
+            return _cached_base_url
+
+        candidates: list[str] = []
+        if configured:
+            candidates.append(cls._normalize_base_url(configured))
+        candidates.append(_DEFAULT_BASE_URL)
+
+        wsl_ip = cls._get_wsl_ip()
+        if wsl_ip:
+            candidates.append(f"http://{wsl_ip}:11434/v1")
+
+        seen: set[str] = set()
+        for base_url in candidates:
+            if base_url in seen:
+                continue
+            seen.add(base_url)
+            if cls._probe_ollama(base_url):
+                _cached_base_url = base_url
+                return base_url
+
+        return None
 
     @staticmethod
     def _normalize_base_url(base_url: str) -> str:
-        # На Windows localhost часто резолвится в ::1, а Ollama слушает 127.0.0.1
         return (
             base_url.replace("http://localhost:", "http://127.0.0.1:")
             .replace("https://localhost:", "https://127.0.0.1:")
+            .rstrip("/")
         )
+
+    @staticmethod
+    def _ollama_root(base_url: str) -> str:
+        root = base_url.rstrip("/")
+        if root.endswith("/v1"):
+            root = root[:-3]
+        return root
+
+    @classmethod
+    def _probe_ollama(cls, base_url: str, timeout_s: float = 3.0) -> bool:
+        url = cls._ollama_root(base_url) + "/api/tags"
+        try:
+            with urllib.request.urlopen(url, timeout=timeout_s) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    @staticmethod
+    def _get_wsl_ip() -> str | None:
+        try:
+            result = subprocess.run(
+                ["wsl", "hostname", "-I"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+        except Exception:
+            return None
+        if result.returncode != 0:
+            return None
+        ip = result.stdout.strip().split()
+        return ip[0] if ip else None
+
+    @staticmethod
+    def _connection_help() -> str:
+        return (
+            "Ollama недоступна. Запустите WSL и Ollama: "
+            "wsl → ollama serve (или ollama list). "
+            "Проверка: http://127.0.0.1:11434/ в браузере."
+        )
+
+    @staticmethod
+    def _format_error(openai_error: Exception, http_error: Exception, base_url: str) -> str:
+        parts = [str(openai_error).strip(), str(http_error).strip()]
+        details = " | ".join(part for part in parts if part)
+        if "10061" in details or "Connection error" in details or "refused" in details.lower():
+            return f"{AIAssistant._connection_help()} ({base_url})"
+        return f"{details} ({base_url})"
 
     @staticmethod
     def _template_answer(
